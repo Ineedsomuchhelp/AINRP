@@ -1,0 +1,18 @@
+
+# Node modules
+node_modules/
+
+# Compiled contract files
+artifacts/
+
+# Environment variable files
+.env
+.env.example
+
+# IDE files
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db

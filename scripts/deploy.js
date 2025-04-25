@@ -6,7 +6,7 @@ async function main() {
 
   const AINRPToken = await hre.ethers.getContractFactory("AINRPToken");
 
-  const token = await AINRPToken.deploy(); // ✅ No arguments
+  const token = await AINRPToken.deploy();
 
   await token.waitForDeployment();
 
