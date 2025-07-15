@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AINRP - Delivery Drone Trust Protocol</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.1/ethers.umd.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" onload="initializeApp()"></script>
+    <style>
+        .drone-marker {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .trust-score-high { color: #10b981; }
+        .trust-score-med { color: #f59e0b; }
+        .trust-score-low { color: #ef4444; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-blue-900 text-white p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-4">
+                <h1 class="text-2xl font-bold">AINRP</h1>
+                <span class="text-blue-200">Delivery Drone Trust Protocol</span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm">Sepolia Testnet</span>
+                <button id="connectWallet" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">
+                    Connect Wallet
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container mx-auto p-6">
+        <!-- Hero Section -->
+        <div class="bg-white rounded-lg shadow-lg p-8 mb-8">
+            <h2 class="text-3xl font-bold text-gray-800 mb-4">Trust & Accountability for Autonomous Drones</h2>
+            <p class="text-gray-600 mb-6">Every drone flight is cryptographically logged, staked, and auditable. See real-time delivery operations with complete transparency.</p>
+            
+            <!-- Stats -->
+            <div class="grid md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-blue-600" id="activeDrones">12</div>
+                    <div class="text-sm text-gray-600">Active Drones</div>
+                </div>
+                <div class="bg-green-50 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-green-600" id="totalDeliveries">1,247</div>
+                    <div class="text-sm text-gray-600">Total Deliveries</div>
+                </div>
+                <div class="bg-purple-50 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-purple-600" id="stakedTokens">50,000</div>
+                    <div class="text-sm text-gray-600">AINRP Tokens Staked</div>
+                </div>
+                <div class="bg-orange-50 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-orange-600" id="trustScore">98.7%</div>
+                    <div class="text-sm text-gray-600">Network Trust Score</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="bg-white rounded-lg shadow-lg mb-8">
+            <div class="border-b border-gray-200">
+                <nav class="flex space-x-8 px-6">
+                    <button class="tab-button py-4 border-b-2 border-blue-500 text-blue-600 font-medium" data-tab="live">
+                        Live Operations
+                    </button>
+                    <button class="tab-button py-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="register">
+                        Register Drone
+                    </button>
+                    <button class="tab-button py-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="explorer">
+                        Audit Explorer
+                    </button>
+                    <button class="tab-button py-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="incidents">
+                        Incident Response
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Live Operations Tab -->
+            <div id="live-tab" class="tab-content p-6">
+                <div class="grid lg:grid-cols-2 gap-6">
+                    <!-- Live Map -->
+                    <div>
+                        <h3 class="text-lg font-semibold mb-4">Live Delivery Map</h3>
+                        <div id="map" style="height: 400px;" class="rounded-lg border"></div>
+                    </div>
+                    
+                    <!-- Activity Feed -->
+                    <div>
+                        <h3 class="text-lg font-semibold mb-4">Real-Time Activity</h3>
+                        <div id="activityFeed" class="space-y-3 max-h-96 overflow-y-auto">
+                            <!-- Activity items will be populated here -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Active Drones -->
+                <div class="mt-8">
+                    <h3 class="text-lg font-semibold mb-4">Active Drones</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full border-collapse border border-gray-300">
+                            <thead>
+                                <tr class="bg-gray-50">
+                                    <th class="border border-gray-300 p-3 text-left">Drone ID</th>
+                                    <th class="border border-gray-300 p-3 text-left">Operator</th>
+                                    <th class="border border-gray-300 p-3 text-left">Status</th>
+                                    <th class="border border-gray-300 p-3 text-left">Current Mission</th>
+                                    <th class="border border-gray-300 p-3 text-left">Trust Score</th>
+                                    <th class="border border-gray-300 p-3 text-left">Stake</th>
+                                </tr>
+                            </thead>
+                            <tbody id="droneTable">
+                                <!-- Drone rows will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Register Drone Tab -->
+            <div id="register-tab" class="tab-content p-6 hidden">
+                <h3 class="text-lg font-semibold mb-4">Register New Delivery Drone</h3>
+                <div class="max-w-2xl">
+                    <form id="droneRegistrationForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Drone Model</label>
+                            <input type="text" id="droneModel" class="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="e.g., DJI M300 RTK">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Operator Company</label>
+                            <input type="text" id="operatorCompany" class="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="e.g., AirDrop Logistics">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Flight Zone</label>
+                            <select id="flightZone" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                                <option value="">Select authorized flight zone</option>
+                                <option value="downtown">Downtown Metro</option>
+                                <option value="suburban">Suburban Residential</option>
+                                <option value="industrial">Industrial District</option>
+                                <option value="rural">Rural Routes</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Stake Amount (AINRP Tokens)</label>
+                            <input type="number" id="stakeAmount" class="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="Minimum 1,000 AINRP" min="1000">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Insurance Policy ID</label>
+                            <input type="text" id="insuranceId" class="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="INS-2024-DRONE-001">
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                            Register Drone & Stake Tokens
+                        </button>
+                    </form>
+                    
+                    <div id="registrationStatus" class="mt-4 hidden">
+                        <div class="bg-green-50 border border-green-200 rounded-md p-4">
+                            <h4 class="font-medium text-green-800">Registration Successful!</h4>
+                            <p class="text-green-700 mt-1">DID: <span id="generatedDID" class="font-mono text-sm"></span></p>
+                            <p class="text-green-700">Transaction Hash: <span id="txHash" class="font-mono text-sm"></span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audit Explorer Tab -->
+            <div id="explorer-tab" class="tab-content p-6 hidden">
+                <h3 class="text-lg font-semibold mb-4">Audit Trail Explorer</h3>
+                
+                <!-- Search -->
+                <div class="mb-6">
+                    <div class="flex space-x-4">
+                        <input type="text" id="searchDrone" placeholder="Search by Drone ID or DID" class="flex-1 border border-gray-300 rounded-md px-3 py-2">
+                        <button id="searchBtn" class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700">Search</button>
+                    </div>
+                </div>
+
+                <!-- Audit Results -->
+                <div id="auditResults">
+                    <div class="bg-gray-50 rounded-lg p-6 text-center">
+                        <p class="text-gray-600">Enter a Drone ID above to view complete audit trail</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Incident Response Tab -->
+            <div id="incidents-tab" class="tab-content p-6 hidden">
+                <h3 class="text-lg font-semibold mb-4">Incident Response System</h3>
+                
+                <!-- Recent Incidents -->
+                <div class="mb-8">
+                    <h4 class="font-medium mb-4">Recent Incidents</h4>
+                    <div id="incidentList" class="space-y-4">
+                        <!-- Incidents will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Incident Response Demo -->
+                <div class="bg-red-50 border border-red-200 rounded-lg p-6">
+                    <h4 class="font-medium text-red-800 mb-4">Incident Response Demo</h4>
+                    <p class="text-red-700 mb-4">Simulate what happens when a drone violates flight restrictions:</p>
+                    <button id="simulateIncident" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
+                        Simulate Incident
+                    </button>
+                    <div id="incidentDemo" class="mt-4 hidden">
+                        <div class="bg-white border border-red-300 rounded-md p-4">
+                            <h5 class="font-medium text-red-800">Incident Response Triggered</h5>
+                            <div class="mt-2 text-sm text-red-700 space-y-1">
+                                <p>✓ Drone immediately grounded</p>
+                                <p>✓ Stake tokens slashed (500 AINRP)</p>
+                                <p>✓ Insurance claim auto-filed</p>
+                                <p>✓ Regulatory authorities notified</p>
+                                <p>✓ Public incident report generated</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let map;
+        let droneMarkers = [];
+        let activityInterval;
+        let provider;
+        let signer;
+        let contract;
+
+        // Contract ABI (simplified for demo)
+        const contractABI = [
+            "function balanceOf(address owner) view returns (uint256)",
+            "function transfer(address to, uint256 amount) returns (bool)",
+            "function totalSupply() view returns (uint256)"
+        ];
+
+        // Contract address from the repository
+        const contractAddress = "0x4b907810E22b2789aE8691fce3B3693DfAE565Bb";
+
+        // Initialize the application
+        function initializeApp() {
+            initializeMap();
+            initializeTabs();
+            startActivityFeed();
+            populateDroneTable();
+            populateIncidents();
+            setupEventListeners();
+        }
+
+        // Fallback initialization if Leaflet loads before the onload event
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof L !== 'undefined') {
+                initializeApp();
+            }
+        });
+
+        // Initialize map
+        function initializeMap() {
+            // Check if Leaflet is available
+            if (typeof L === 'undefined') {
+                console.error('Leaflet not loaded yet');
+                // Show a placeholder instead of crashing
+                document.getElementById('map').innerHTML = '<div class="flex items-center justify-center h-full bg-gray-100 rounded-lg"><p class="text-gray-600">Loading map...</p></div>';
+                return;
+            }
+
+            map = L.map('map').setView([40.7128, -74.0060], 12); // NYC
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Add some sample drone markers
+            const droneLocations = [
+                { id: 'DRN-001', lat: 40.7580, lng: -73.9855, status: 'delivering' },
+                { id: 'DRN-002', lat: 40.7505, lng: -73.9934, status: 'returning' },
+                { id: 'DRN-003', lat: 40.7282, lng: -73.9942, status: 'idle' }
+            ];
+
+            droneLocations.forEach(drone => {
+                const marker = L.marker([drone.lat, drone.lng]).addTo(map);
+                marker.bindPopup(`
+                    <div class="p-2">
+                        <h4 class="font-semibold">${drone.id}</h4>
+                        <p class="text-sm">Status: ${drone.status}</p>
+                        <p class="text-sm">Trust Score: 97.3%</p>
+                    </div>
+                `);
+                droneMarkers.push(marker);
+            });
+        }
+
+        // Initialize tabs
+        function initializeTabs() {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetTab = button.dataset.tab;
+                    
+                    // Update button states
+                    tabButtons.forEach(btn => {
+                        btn.classList.remove('border-blue-500', 'text-blue-600');
+                        btn.classList.add('border-transparent', 'text-gray-500');
+                    });
+                    button.classList.add('border-blue-500', 'text-blue-600');
+                    button.classList.remove('border-transparent', 'text-gray-500');
+                    
+                    // Update content visibility
+                    tabContents.forEach(content => {
+                        content.classList.add('hidden');
+                    });
+                    document.getElementById(targetTab + '-tab').classList.remove('hidden');
+                });
+            });
+        }
+
+        // Start activity feed
+        function startActivityFeed() {
+            const activities = [
+                { drone: 'DRN-001', action: 'Package delivered to 123 Main St', time: '2 min ago', type: 'success' },
+                { drone: 'DRN-002', action: 'Takeoff from Distribution Center Alpha', time: '3 min ago', type: 'info' },
+                { drone: 'DRN-003', action: 'Route optimization completed', time: '5 min ago', type: 'info' },
+                { drone: 'DRN-004', action: 'Low battery warning - returning to base', time: '7 min ago', type: 'warning' },
+                { drone: 'DRN-001', action: 'Package pickup confirmed', time: '12 min ago', type: 'success' }
+            ];
+
+            const feedContainer = document.getElementById('activityFeed');
+            
+            activities.forEach(activity => {
+                const activityItem = document.createElement('div');
+                activityItem.className = 'bg-gray-50 rounded-lg p-4 border-l-4 ' + 
+                    (activity.type === 'success' ? 'border-green-500' : 
+                     activity.type === 'warning' ? 'border-yellow-500' : 'border-blue-500');
+                
+                activityItem.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="font-medium text-gray-800">${activity.drone}</p>
+                            <p class="text-sm text-gray-600">${activity.action}</p>
+                        </div>
+                        <span class="text-xs text-gray-500">${activity.time}</span>
+                    </div>
+                `;
+                
+                feedContainer.appendChild(activityItem);
+            });
+
+            // Simulate new activities
+            setInterval(() => {
+                const newActivity = {
+                    drone: 'DRN-' + String(Math.floor(Math.random() * 10) + 1).padStart(3, '0'),
+                    action: getRandomActivity(),
+                    time: 'Just now',
+                    type: Math.random() > 0.8 ? 'warning' : Math.random() > 0.5 ? 'success' : 'info'
+                };
+                
+                const activityItem = document.createElement('div');
+                activityItem.className = 'bg-gray-50 rounded-lg p-4 border-l-4 ' + 
+                    (newActivity.type === 'success' ? 'border-green-500' : 
+                     newActivity.type === 'warning' ? 'border-yellow-500' : 'border-blue-500');
+                
+                activityItem.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="font-medium text-gray-800">${newActivity.drone}</p>
+                            <p class="text-sm text-gray-600">${newActivity.action}</p>
+                        </div>
+                        <span class="text-xs text-gray-500">${newActivity.time}</span>
+                    </div>
+                `;
+                
+                feedContainer.insertBefore(activityItem, feedContainer.firstChild);
+                
+                // Remove old items if too many
+                if (feedContainer.children.length > 10) {
+                    feedContainer.removeChild(feedContainer.lastChild);
+                }
+            }, 5000);
+        }
+
+        function getRandomActivity() {
+            const activities = [
+                'Package delivered successfully',
+                'Takeoff authorized',
+                'Route recalculated due to weather',
+                'Landing at delivery location',
+                'Package pickup confirmed',
+                'Battery level check passed',
+                'GPS coordinates verified',
+                'Obstacle avoidance activated'
+            ];
+            return activities[Math.floor(Math.random() * activities.length)];
+        }
+
+        // Populate drone table
+        function populateDroneTable() {
+            const drones = [
+                { id: 'DRN-001', operator: 'AirDrop Logistics', status: 'Delivering', mission: 'Package to 123 Main St', trustScore: 98.5, stake: 2500 },
+                { id: 'DRN-002', operator: 'SkyNet Delivery', status: 'Returning', mission: 'Return to base', trustScore: 97.2, stake: 3000 },
+                { id: 'DRN-003', operator: 'AirDrop Logistics', status: 'Idle', mission: 'Awaiting dispatch', trustScore: 99.1, stake: 2000 },
+                { id: 'DRN-004', operator: 'QuickFly Express', status: 'Charging', mission: 'Maintenance', trustScore: 96.8, stake: 1500 }
+            ];
+
+            const tableBody = document.getElementById('droneTable');
+            
+            drones.forEach(drone => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                
+                const trustClass = drone.trustScore >= 98 ? 'trust-score-high' : 
+                                 drone.trustScore >= 95 ? 'trust-score-med' : 'trust-score-low';
+                
+                row.innerHTML = `
+                    <td class="border border-gray-300 p-3">${drone.id}</td>
+                    <td class="border border-gray-300 p-3">${drone.operator}</td>
+                    <td class="border border-gray-300 p-3">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(drone.status)}">
+                            ${drone.status}
+                        </span>
+                    </td>
+                    <td class="border border-gray-300 p-3">${drone.mission}</td>
+                    <td class="border border-gray-300 p-3 font-medium ${trustClass}">${drone.trustScore}%</td>
+                    <td class="border border-gray-300 p-3">${drone.stake} AINRP</td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+
+        function getStatusColor(status) {
+            switch(status) {
+                case 'Delivering': return 'bg-blue-100 text-blue-800';
+                case 'Returning': return 'bg-yellow-100 text-yellow-800';
+                case 'Idle': return 'bg-green-100 text-green-800';
+                case 'Charging': return 'bg-gray-100 text-gray-800';
+                default: return 'bg-gray-100 text-gray-800';
+            }
+        }
+
+        // Populate incidents
+        function populateIncidents() {
+            const incidents = [
+                {
+                    id: 'INC-001',
+                    drone: 'DRN-007',
+                    type: 'Flight Restriction Violation',
+                    time: '2024-07-14 14:30:00',
+                    severity: 'High',
+                    status: 'Resolved',
+                    description: 'Drone entered restricted airspace near airport'
+                },
+                {
+                    id: 'INC-002',
+                    drone: 'DRN-012',
+                    type: 'Package Drop Failure',
+                    time: '2024-07-14 11:15:00',
+                    severity: 'Medium',
+                    status: 'Under Review',
+                    description: 'Package not delivered to correct address'
+                }
+            ];
+
+            const incidentList = document.getElementById('incidentList');
+            
+            incidents.forEach(incident => {
+                const incidentItem = document.createElement('div');
+                incidentItem.className = 'bg-white border border-gray-200 rounded-lg p-4';
+                
+                const severityColor = incident.severity === 'High' ? 'text-red-600' : 
+                                     incident.severity === 'Medium' ? 'text-yellow-600' : 'text-green-600';
+                
+                incidentItem.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <h5 class="font-medium text-gray-800">${incident.id} - ${incident.type}</h5>
+                        <span class="text-xs px-2 py-1 rounded ${severityColor} bg-opacity-20">${incident.severity}</span>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-2">${incident.description}</p>
+                    <div class="flex justify-between text-xs text-gray-500">
+                        <span>Drone: ${incident.drone}</span>
+                        <span>Time: ${incident.time}</span>
+                        <span>Status: ${incident.status}</span>
+                    </div>
+                `;
+                
+                incidentList.appendChild(incidentItem);
+            });
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Wallet connection
+            document.getElementById('connectWallet').addEventListener('click', connectWallet);
+            
+            // Drone registration
+            document.getElementById('droneRegistrationForm').addEventListener('submit', registerDrone);
+            
+            // Search functionality
+            document.getElementById('searchBtn').addEventListener('click', searchDrone);
+            
+            // Incident simulation
+            document.getElementById('simulateIncident').addEventListener('click', simulateIncident);
+        }
+
+        // Connect wallet
+        async function connectWallet() {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    provider = new ethers.BrowserProvider(window.ethereum);
+                    signer = await provider.getSigner();
+                    contract = new ethers.Contract(contractAddress, contractABI, signer);
+                    
+                    document.getElementById('connectWallet').textContent = 'Connected';
+                    document.getElementById('connectWallet').classList.add('bg-green-600');
+                } catch (error) {
+                    console.error('Error connecting wallet:', error);
+                }
+            } else {
+                alert('Please install MetaMask to connect your wallet');
+            }
+        }
+
+        // Register drone
+        function registerDrone(e) {
+            e.preventDefault();
+            
+            const formData = {
+                model: document.getElementById('droneModel').value,
+                operator: document.getElementById('operatorCompany').value,
+                flightZone: document.getElementById('flightZone').value,
+                stakeAmount: document.getElementById('stakeAmount').value,
+                insuranceId: document.getElementById('insuranceId').value
+            };
+            
+            // Simulate registration process
+            setTimeout(() => {
+                const did = 'did:ainrp:' + Math.random().toString(36).substr(2, 9);
+                const txHash = '0x' + Math.random().toString(16).substr(2, 64);
+                
+                document.getElementById('generatedDID').textContent = did;
+                document.getElementById('txHash').textContent = txHash;
+                document.getElementById('registrationStatus').classList.remove('hidden');
+                
+                // Reset form
+                document.getElementById('droneRegistrationForm').reset();
+            }, 2000);
+        }
+
+        // Search drone
+        function searchDrone() {
+            const searchTerm = document.getElementById('searchDrone').value;
+            
+            if (!searchTerm) {
+                alert('Please enter a Drone ID or DID');
+                return;
+            }
+            
+            // Simulate search results
+            const auditResults = document.getElementById('auditResults');
+            auditResults.innerHTML = `
+                <div class="bg-white rounded-lg border border-gray-200 p-6">
+                    <h4 class="font-semibold mb-4">Audit Trail for ${searchTerm}</h4>
+                    <div class="space-y-4">
+                        <div class="border-l-4 border-blue-500 pl-4 py-2">
+                            <p class="font-medium">Registration</p>
+                            <p class="text-sm text-gray-600">2024-07-01 09:00:00 - Drone registered with 2,500 AINRP stake</p>
+                        </div>
+                        <div class="border-l-4 border-green-500 pl-4 py-2">
+                            <p class="font-medium">Flight Authorization</p>
+                            <p class="text-sm text-gray-600">2024-07-14 10:30:00 - Authorized for suburban delivery mission</p>
+                        </div>
+                        <div class="border-l-4 border-green-500 pl-4 py-2">
+                            <p class="font-medium">Package Pickup</p>
+                            <p class="text-sm text-gray-600">2024-07-14 11:15:00 - Package ID: PKG-789 confirmed</p>
+                        </div>
+                        <div class="border-l-4 border-green-500 pl-4 py-2">
+                            <p class="font-medium">Delivery Complete</p>
+                            <p class="text-sm text-gray-600">2024-07-14 12:00:00 - Package delivered to 123 Main St</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Simulate incident
+        function simulateIncident() {
+            document.getElementById('incidentDemo').classList.remove('hidden');
+            
+            // Update stats to show incident impact
+            setTimeout(() => {
+                document.getElementById('trustScore').textContent = '97.8%';
+                document.getElementById('stakedTokens').textContent = '49,500';
+            }, 1000);
+        }
+
+        // Update stats periodically
+        setInterval(() => {
+            document.getElementById('totalDeliveries').textContent = 
+                parseInt(document.getElementById('totalDeliveries').textContent) + Math.floor(Math.random() * 3);
+        }, 10000);
+    </script>
+</body>
+</html>
